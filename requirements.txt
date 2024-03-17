@@ -6,3 +6,4 @@ tpot
 scikit-learn
 openai
 nltk
+shap
