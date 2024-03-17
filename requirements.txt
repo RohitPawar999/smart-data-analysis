@@ -5,3 +5,4 @@ ydata_profiling
 tpot
 scikit-learn
 openai
+nltk
