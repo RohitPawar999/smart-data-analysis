@@ -5,29 +5,22 @@ import matplotlib.pyplot as plt
 from ydata_profiling import ProfileReport
 import os
 import re
-
 import base64
 from io import BytesIO
-
 from sklearn.decomposition import PCA
 from scipy.stats import boxcox
 import shap
-
-
-
 import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.model_selection import train_test_split
-
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from scipy import stats
 from tpot import TPOTClassifier
 from tpot import TPOTRegressor
 from sklearn import metrics
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix,f1_score
 import openai
-
 from sklearn.metrics import accuracy_score, r2_score, confusion_matrix
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer
@@ -198,12 +191,14 @@ def run_model( X_train, X_test, y_train, y_test,select_algo):
         accuracy = accuracy_score(y_test, predictions)
         classification_report_str = classification_report(y_test, predictions)
         confusion_mat = confusion_matrix(y_test, predictions)
+        f1 = f1_score(y_test, predictions, average='weighted')
 
         st.write(f"Accuracy: {accuracy}")
         st.write("Classification Report:")
         st.write(classification_report_str)
         st.write("Confusion Matrix:")
         st.write(confusion_mat)
+        st.write(f"F1-score: {f1}")
 
         # Plot confusion matrix
         plt.figure(figsize=(8, 6))
@@ -216,9 +211,10 @@ def run_model( X_train, X_test, y_train, y_test,select_algo):
         # Pass the Matplotlib figure to st.pyplot()
         st.pyplot(plt.gcf())
 
-        explainer = shap.Explainer((tpot_classifier.fitted_pipeline_.steps[-1][1]))
-        shap_values = explainer(X_test)
+        explainer = shap.TreeExplainer(tpot_classifier.fitted_pipeline_.steps[-1][1])
+        shap_values = explainer.shap_values(X_test)
 
+        # Plot SHAP summary plot
         plt.figure(figsize=(10, 6))
         shap.summary_plot(shap_values, X_test, plot_type="bar")
         st.pyplot(plt.gcf())
@@ -240,11 +236,21 @@ def run_model( X_train, X_test, y_train, y_test,select_algo):
         mse = mean_squared_error(y_test, predictions)
         mae = mean_absolute_error(y_test, predictions)
         r2 = r2_score(y_test, predictions)
+        mape = np.mean(np.abs((y_test - predictions) / y_test)) * 100
 
         # Display metrics
         st.write(f"Mean Squared Error: {mse}")
         st.write(f"Mean Absolute Error: {mae}")
         st.write(f"R-squared: {r2}")
+        st.write(f"MAPE: {mape}%")
+
+        explainer = shap.TreeExplainer(tpot_regressor.fitted_pipeline_.steps[-1][1])
+        shap_values = explainer.shap_values(X_test)
+
+        # Plot SHAP summary plot
+        plt.figure(figsize=(10, 6))
+        shap.summary_plot(shap_values, X_test, plot_type="bar")
+        st.pyplot(plt.gcf())
 
         # Visualization: Predicted vs Actual values
         plt.figure(figsize=(10, 6))
