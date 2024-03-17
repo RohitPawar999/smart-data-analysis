@@ -5,20 +5,20 @@ import matplotlib.pyplot as plt
 from ydata_profiling import ProfileReport
 import os
 import re
-from datetime import datetime
+
 import base64
 from io import BytesIO
-from sklearn.neighbors import LocalOutlierFactor
+
 from sklearn.decomposition import PCA
+from scipy.stats import boxcox
+import shap
 
 
-from sklearn.impute import SimpleImputer
+
 import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.model_selection import GridSearchCV
+
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from scipy import stats
 from tpot import TPOTClassifier
@@ -27,16 +27,12 @@ from sklearn import metrics
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import openai
-from nltk.corpus import stopwords
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.svm import SVC, SVR
+
 from sklearn.metrics import accuracy_score, r2_score, confusion_matrix
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer
 
-from sklearn.neural_network import MLPClassifier
+
 st.set_page_config(page_title="Data Analysis Tool", page_icon="📊")
 st.header("Smart Data Analysis 📊")
 
@@ -71,6 +67,16 @@ def perform_analysis(dataset):
 
 
 def draw_graph(graph_type, x_axis, y_axis, dataset, z_axis=None):
+    numeric_columns = dataset.select_dtypes(include=[int, float]).columns
+    for col in numeric_columns:
+        dataset[col] = dataset[col].fillna(np.random.choice(dataset[col].dropna()))
+        dataset.drop_duplicates(inplace=True)
+
+    label_encoder = LabelEncoder()
+    for col in dataset.select_dtypes(include=['object']).columns:
+        dataset[col] = label_encoder.fit_transform(dataset[col])
+
+    dataset = dataset.astype(int)
 
 
     st.subheader("Graph:")
@@ -210,6 +216,13 @@ def run_model( X_train, X_test, y_train, y_test,select_algo):
         # Pass the Matplotlib figure to st.pyplot()
         st.pyplot(plt.gcf())
 
+        explainer = shap.Explainer((tpot_classifier.fitted_pipeline_.steps[-1][1]))
+        shap_values = explainer(X_test)
+
+        plt.figure(figsize=(10, 6))
+        shap.summary_plot(shap_values, X_test, plot_type="bar")
+        st.pyplot(plt.gcf())
+
         # Access the best pipeline and display details
         best_pipeline = tpot_classifier.fitted_pipeline_
         st.write("Best Model:")
@@ -326,8 +339,18 @@ def NLP_Training(X_train, X_test, y_train, y_test):
     accuracy = metrics.accuracy_score(y_test, predictions)
     st.write(f"TPOT Accuracy: {accuracy}")
 
+def transform_data(data, method):
+    if method == "Log Transformation":
+        return np.log1p(data)  # Adding 1 to avoid log(0)
+    elif method == "Box-Cox Transformation":
+        sns.distplot(data, hist=False, kde=True)
+        transformed_data, best_lambda = boxcox(data)
+        sns.distplot(transformed_data, hist=False, kde=True)
+        return transformed_data
+    else:
+        return data
 
-def preprocess_data(select, dataset, select1, test_size_percentage, columns_to_delete, target_column_3,outlier_handling,use_pca=False, n_components=None):
+def preprocess_data(select, dataset, select1, test_size_percentage, columns_to_delete, target_column_3,outlier_handling,use_pca=False, n_components=None,select_transform=None):
     st.subheader("Null Value adjustment and removal of dublicates Preprocessing:")
 
     numeric_columns = dataset.select_dtypes(include=[np.number]).columns
@@ -363,6 +386,22 @@ def preprocess_data(select, dataset, select1, test_size_percentage, columns_to_d
     st.session_state.preprocessed_dataset = dataset.copy()
 
     header(dataset)
+
+    datetime_columns = dataset.select_dtypes(include=['datetime64']).columns
+    st.subheader("Handling DateTime Columns if present:")
+    for col in datetime_columns:
+        # Extract useful features from datetime columns
+        dataset[col + '_year'] = dataset[col].dt.year
+        dataset[col + '_month'] = dataset[col].dt.month
+        dataset[col + '_day'] = dataset[col].dt.day
+        dataset[col + '_hour'] = dataset[col].dt.hour
+        # You can add more features like minute, second, etc. as needed
+    # Drop original datetime columns
+    dataset.drop(columns=datetime_columns, inplace=True)
+    # Display updated dataset
+    header(dataset)
+
+
 
     st.subheader("Applying Encoding:")
 
@@ -400,6 +439,19 @@ def preprocess_data(select, dataset, select1, test_size_percentage, columns_to_d
     dataset = dataset.drop(target_column_3, axis=1)
     numeric_columns_1 = dataset.select_dtypes(include=[np.number]).columns
 
+    st.subheader("Data Transformation:")
+
+    # Check if a transformation method is selected
+    if select_transform:
+        st.write(f"Transformation method: {select_transform}")
+        if select_transform == "Log Transformation":
+            dataset[numeric_columns_1]= np.log1p(dataset[numeric_columns_1])
+        if select_transform == "Square root transformation":
+            dataset[numeric_columns_1]==np.sqrt(dataset[numeric_columns_1])
+
+
+    header(dataset)
+
 
     st.subheader("Now performing normalization:")
 
@@ -427,7 +479,7 @@ def preprocess_data(select, dataset, select1, test_size_percentage, columns_to_d
     if use_pca:
         st.subheader("Applying PCA:")
 
-        st.write(f"Number of components: {n_components}")
+        st.write(f"Number of components in pca: {n_components}")
 
         pca = PCA(n_components=n_components)
         dataset_pca = pca.fit_transform(dataset)
@@ -563,16 +615,17 @@ def main():
 
             elif "model" in user.lower():
                 type = st.text_input("Type of model[Regression/Classification]")
-                if type.lower() == "regression":
-                    problem_type_1 = "Regression"
-                    run_model(st.session_state.X_train, st.session_state.X_test, st.session_state.y_train,
-                              st.session_state.y_test, problem_type_1)
-                elif type.lower() == "classification":
-                    problem_type_1 = "Classification"
-                    run_model(st.session_state.X_train, st.session_state.X_test, st.session_state.y_train,
-                              st.session_state.y_test, problem_type_1)
-                else:
-                    st.write("Invalid model type. Please enter 'Regression' or 'Classification'.")
+                if type:
+                    if type.lower() == "regression":
+                        problem_type_1 = "Regression"
+                        run_model(st.session_state.X_train, st.session_state.X_test, st.session_state.y_train,
+                                  st.session_state.y_test, problem_type_1)
+                    elif type.lower() == "classification":
+                        problem_type_1 = "Classification"
+                        run_model(st.session_state.X_train, st.session_state.X_test, st.session_state.y_train,
+                                  st.session_state.y_test, problem_type_1)
+                    else:
+                        st.write("Invalid model type. Please enter 'Regression' or 'Classification'.")
 
 
             elif "visualization" in user.lower() or "visualize" in user.lower() or "visualise" in user.lower() or "graph" in user.lower():
@@ -580,7 +633,7 @@ def main():
                     with st.form(key="graph"):
                         graph_type = st.selectbox(
                             "Select Graph Type",
-                            ["Line Plot", "Bar Plot", "Histogram", "Pair Plot", "Heatmap", "Scatter Plot",
+                            ["Line Plot", "Bar Plot", "Histogram", "Pair Plot", "Scatter Plot",
                              "Boxplot", "Violin Plot", "Eventplot", "Hexbin", "Pie Chart", "ECDF", "2D Histogram",
                              "3D Scatter Plot", "3D Surface Plot-1"]
                         )
@@ -596,38 +649,59 @@ def main():
                         draw_graph(graph_type, x_axis, y_axis, dataset, z_axis)
 
 
+
             elif "preprocessing" in user.lower() or "preprocess" in user.lower():
+
                 st.write("Select the parameters")
+
                 with st.form(key='preprocessing'):
+
                     Null_value = st.selectbox(
+
                         "Select method for null value",
-                        ["Remove Null Values", "Add Mean Values", "Add Random Values from Column"]
+
+                        ["Remove Null Values", "Add Mean Values", "Add Random Values from Column", None]
+
                     )
+
                     normalisation = st.selectbox(
+
                         "Select the method for normalization",
-                        ["Standard Scaler", "Min-Max Scaler", "Robust Scaler"]
+
+                        ["Standard Scaler", "Min-Max Scaler", "Robust Scaler", None]
+
                     )
 
                     test_size_percentage = st.slider("Test Set Percentage", 1, 50, 20, 1,
+
                                                      key="test_size_percentage")
 
-                    columns_to_delete = st.text_input("Enter columns to delete (comma-separated):")
-                    columns_to_delete = [col.strip() for col in columns_to_delete.split(',')]
+                    columns_to_delete = st.multiselect("Select columns to delete:", dataset.columns)
 
                     outlier_handling = st.selectbox("Select Outlier Handling Method",
+
                                                     ["None", "Z-Score", "IQR"])
 
+                    select_transformation = st.selectbox("Select transformation Method",
+
+                                                         ["Log Transformation", "Square root transformation", None])
+
                     target_column_3 = st.selectbox(
+
                         "Select the target Please ignore the columns which are deleted ",
+
                         dataset.columns, key="target_column_3")
+
                     n_components = st.slider("Number of Components", 2, min(len(dataset.columns), 20), 2)
+
                     use_pca = st.checkbox("Enable PCA")
 
                     submit = st.form_submit_button(label='data_preprocessing')
 
                 if submit:
                     preprocess_data(Null_value, dataset, normalisation, test_size_percentage, columns_to_delete,
-                                    target_column_3, outlier_handling, use_pca, n_components)
+
+                                    target_column_3, outlier_handling, use_pca, n_components, select_transformation)
 
         openai.api_key = "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"
 
