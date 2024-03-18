@@ -4,6 +4,6 @@ seaborn==0.11.2
 ydata_profiling
 tpot
 scikit-learn
-openai
+ openai==0.28
 nltk
 shap
