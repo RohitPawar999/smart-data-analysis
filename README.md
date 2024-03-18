@@ -9,6 +9,7 @@ The Smart Data Analysis app is a web-based application designed to perform vario
 - **Data Visualization:** Visualize data using various types of plots including histograms, scatter plots, and heatmaps.
 - **Model Building:** Train machine learning models for regression or classification tasks and evaluate their performance.
 
+app link: https://smart-data-analysis.streamlit.app/
 
 ## Installation
 
