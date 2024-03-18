@@ -607,19 +607,28 @@ def main():
                  "5. To Visualize Dataset\n"
                  "6. To run model")
 
-        user = st.text_input("Message")
+        st.sidebar.write("Write Function name which you want to perform .....")
+
+        user = st.sidebar.text_input("Write Function name")
 
         if user:
-            if "information" in user.lower():
+            st.sidebar.info(f"user: {user}")
+            if "hi" in user.lower() or "hello" in user.lower():
+                st.sidebar.info("Hello how can I help you ")
+            elif "information" in user.lower():
+                st.sidebar.info("Sure..")
                 information(dataset)
 
             elif "report" in user.lower():
+                st.sidebar.info("Sure..")
                 perform_analysis(dataset)
 
             elif "header" in user.lower():
+                st.sidebar.info("Sure..")
                 header(dataset)
 
             elif "model" in user.lower():
+                st.sidebar.info("Sure..")
                 type = st.text_input("Type of model[Regression/Classification]")
                 if type:
                     if type.lower() == "regression":
@@ -635,28 +644,31 @@ def main():
 
 
             elif "visualization" in user.lower() or "visualize" in user.lower() or "visualise" in user.lower() or "graph" in user.lower():
-                    st.write("Select the parameters")
-                    with st.form(key="graph"):
-                        graph_type = st.selectbox(
-                            "Select Graph Type",
-                            ["Line Plot", "Bar Plot", "Histogram", "Pair Plot", "Scatter Plot",
-                             "Boxplot", "Violin Plot", "Eventplot", "Hexbin", "Pie Chart", "ECDF", "2D Histogram",
-                             "3D Scatter Plot", "3D Surface Plot-1"]
-                        )
+                st.sidebar.info("Sure..")
+                st.write("Select the parameters")
+                with st.form(key="graph"):
+                    graph_type = st.selectbox(
+                        "Select Graph Type",
+                        ["Line Plot", "Bar Plot", "Histogram", "Pair Plot", "Scatter Plot",
+                         "Boxplot", "Violin Plot", "Eventplot", "Hexbin", "Pie Chart", "ECDF", "2D Histogram",
+                         "3D Scatter Plot", "3D Surface Plot-1"]
+                    )
 
-                        x_axis = st.selectbox("Select X-axis", dataset.columns)
-                        y_axis = st.selectbox("Select Y-axis", dataset.columns)
-                        z_axis = st.selectbox("Select Z-axis", dataset.columns)
+                    x_axis = st.selectbox("Select X-axis", dataset.columns)
+                    y_axis = st.selectbox("Select Y-axis", dataset.columns)
+                    z_axis = st.selectbox("Select Z-axis", dataset.columns)
 
-                        submit_graph = st.form_submit_button(label='Graph')
+                    submit_graph = st.form_submit_button(label='Graph')
 
-                    if submit_graph:
-                        st.write("Here is the graph:")
-                        draw_graph(graph_type, x_axis, y_axis, dataset, z_axis)
+                if submit_graph:
+                    st.write("Here is the graph:")
+                    draw_graph(graph_type, x_axis, y_axis, dataset, z_axis)
+
 
 
 
             elif "preprocessing" in user.lower() or "preprocess" in user.lower():
+                st.sidebar.info("Sure..")
 
                 st.write("Select the parameters")
 
@@ -709,31 +721,10 @@ def main():
 
                                     target_column_3, outlier_handling, use_pca, n_components, select_transformation)
 
-        openai.api_key = "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"
+            else:
+                st.sidebar.info("Please write correct Fuction name..")
 
-        st.sidebar.write("If you want to know about any concept or have any query you can ask here")
 
-        user_prompt=st.sidebar.chat_input("Write query")
-        if user_prompt:
-            st.sidebar.info(f"User: {user_prompt}")
-            # Add user message to chat history
-
-            openai.api_key = "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"
-
-            if user_prompt:
-                messages = [
-                    {"role": "system", "content": "You are a kind helpful assistant."},
-                ]
-                # Add user input to messages
-                messages.append({"role": "user", "content": user_prompt})  # Corrected parameter name
-
-                # Call OpenAI API
-                chat = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=messages)
-
-                # Extract assistant's reply
-                assistant_reply = chat.choices[0].message.content
-
-                st.sidebar.info(f"Zira: {assistant_reply}")
 
 
 if __name__ == "__main__":
